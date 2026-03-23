@@ -1,25 +1,23 @@
+// ─────────────────────────────────────────────
+//  screen-time · Android build.gradle
+//  Correct pattern for Expo SDK 54 local module:
+//  1. Load ExpoModulesCorePlugin.gradle to register
+//     the 'expo-module' Gradle plugin
+//  2. Apply standard Android + Kotlin plugins
+//  3. Apply 'expo-module' (now available after step 1)
+// ─────────────────────────────────────────────
+buildscript {
+  def expoModulesCorePlugin = new File(
+    project(":expo-modules-core").projectDir.absolutePath,
+    "ExpoModulesCorePlugin.gradle"
+  )
+  if (expoModulesCorePlugin.exists()) {
+    apply from: expoModulesCorePlugin
+    applyKotlinExpoModulesCorePlugin()
+  }
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'expo-module'
 
-android {
-  namespace 'expo.modules.screentime'
-  compileSdkVersion 35
-
-  defaultConfig {
-    minSdkVersion 24
-    targetSdkVersion 35
-  }
-
-  compileOptions {
-    sourceCompatibility JavaVersion.VERSION_11
-    targetCompatibility JavaVersion.VERSION_11
-  }
-
-  kotlinOptions {
-    jvmTarget = '11'
-  }
-}
-
-dependencies {
-  api project(':expo-modules-core')
-}

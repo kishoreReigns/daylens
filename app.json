@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "DayLens AI",
+    "slug": "daylens-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0B0B0F"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "DayLens needs motion access to track your daily steps."
+        }
+      ],
+      "./plugins/withScreenTime"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.daylens.ai",
+      "infoPlist": {
+        "NSMotionUsageDescription": "DayLens needs motion access to track your daily steps."
+      }
+    },
+    "android": {
+      "package": "com.daylens.ai",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+      ]
+    },
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "a2481417-85bb-4e42-8140-3741baaa6ab3"
+      }
+    },
+    "owner": "kishore0109"
+  }
+}

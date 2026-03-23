@@ -1,0 +1,51 @@
+# ── Node ─────────────────────────────────────
+node_modules/
+
+# ── Expo ─────────────────────────────────────
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# ── Native build outputs (root prebuild only) ─
+/android/
+/ios/
+*.apk
+*.aab
+*.ipa
+
+# ── Gradle (local module) ─────────────────────
+modules/*/android/.gradle/
+modules/*/android/build/
+modules/*/android/local.properties
+
+# ── EAS ──────────────────────────────────────
+.easignore
+
+# ── TypeScript ───────────────────────────────
+*.tsbuildinfo
+
+# ── OS ───────────────────────────────────────
+.DS_Store
+Thumbs.db
+.DS_Store?
+desktop.ini
+
+# ── Editors ──────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── Logs ─────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# ── Env secrets ──────────────────────────────
+.env
+.env.local
+.env.production

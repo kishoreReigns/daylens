@@ -1,0 +1,11 @@
+{
+  "name": "screen-time",
+  "version": "1.0.0",
+  "platforms": ["android", "ios"],
+  "android": {
+    "modules": ["expo.modules.screentime.ScreenTimeModule"]
+  },
+  "ios": {
+    "modules": ["ScreenTimeModule"]
+  }
+}

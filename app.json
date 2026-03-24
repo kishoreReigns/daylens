@@ -9,7 +9,6 @@
       "backgroundColor": "#0B0B0F"
     },
     "plugins": [
-      "expo-dev-client",
       [
         "expo-sensors",
         {

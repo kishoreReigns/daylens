@@ -76,7 +76,19 @@ export function useStepCounter(goal: number = DEFAULT_GOAL): StepData {
         let subscription: ReturnType<typeof Pedometer.watchStepCount> | null = null;
 
         const init = async () => {
-            // 1) Check hardware availability
+            // 1) Request permission — triggers Android dialog on first launch
+            try {
+                const { status } = await Pedometer.requestPermissionsAsync();
+                if (status !== 'granted') {
+                    setError('Permission denied — enable Physical Activity in Settings');
+                    setIsAvailable(false);
+                    return;
+                }
+            } catch {
+                // Some older Android devices don't use runtime permission — continue
+            }
+
+            // 2) Check hardware availability
             try {
                 const available = await Pedometer.isAvailableAsync();
                 setIsAvailable(available);
@@ -91,10 +103,10 @@ export function useStepCounter(goal: number = DEFAULT_GOAL): StepData {
                 return;
             }
 
-            // 2) Fetch historical count for today
+            // 3) Fetch historical count for today
             await fetchHistoricalSteps();
 
-            // 3) Start live subscription
+            // 4) Start live subscription
             try {
                 subscription = Pedometer.watchStepCount((result) => {
                     liveStepsRef.current = result.steps;
@@ -108,7 +120,7 @@ export function useStepCounter(goal: number = DEFAULT_GOAL): StepData {
 
         init();
 
-        // 4) Re-fetch when user returns to app (handles midnight rollover, etc.)
+        // 5) Re-fetch when user returns to app (handles midnight rollover, etc.)
         const handleAppState = (state: AppStateStatus) => {
             if (state === 'active') {
                 fetchHistoricalSteps();

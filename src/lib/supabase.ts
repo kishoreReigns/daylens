@@ -14,8 +14,8 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 // ── Replace with your project values ─────────
-const SUPABASE_URL  = 'https://YOUR_PROJECT_REF.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+const SUPABASE_URL  = 'https://qvkopexsixfzyhxnhigk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Kbs3JKnT4T2ncWDMjLoNwg_tPkO6j6e';
 // ─────────────────────────────────────────────
 
 if (

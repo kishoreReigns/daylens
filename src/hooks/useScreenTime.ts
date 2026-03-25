@@ -39,9 +39,7 @@ export function useScreenTime(): ScreenTimeState {
         const perm = await ScreenTime.hasPermission();
         setHasPerm(perm);
         if (!perm) {
-          // Open Usage Access settings on first load so user sees the prompt
-          await ScreenTime.openPermissionSettings();
-          // Set empty state — app-state listener will refresh when user returns
+          // Don't auto-navigate — show "tap to grant" UI state
           setData({ permitted: false, totalTodayMs: 0, apps: [] });
           return;
         }

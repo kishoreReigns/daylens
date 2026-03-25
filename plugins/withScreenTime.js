@@ -60,19 +60,33 @@ const withScreenTimeMainApplication = (config) => {
 
     // Add import if not already present
     if (!contents.includes(importLine)) {
-      // Insert after the last `import` line in the file
       contents = contents.replace(
         /(import [^\n]+\n)(\n*class )/,
         `$1${importLine}\n$2`
       );
     }
 
-    // Add package registration if not already present
+    // Handle both RN patterns if ScreenTimePackage not yet registered:
     if (!contents.includes("ScreenTimePackage()")) {
-      contents = contents.replace(
-        /val packages = PackageList\(this\)\.packages/,
-        "val packages = PackageList(this).packages\n        packages.add(ScreenTimePackage())"
-      );
+      // Pattern A (older RN): val packages = PackageList(this).packages
+      if (contents.includes("val packages = PackageList(this).packages")) {
+        contents = contents.replace(
+          "val packages = PackageList(this).packages",
+          "val packages = PackageList(this).packages\n        packages.add(ScreenTimePackage())"
+        );
+      // Pattern B (RN 0.71+): return PackageList(this).packages
+      } else if (contents.includes("return PackageList(this).packages")) {
+        contents = contents.replace(
+          "return PackageList(this).packages",
+          "val packages = PackageList(this).packages\n          packages.add(ScreenTimePackage())\n          return packages"
+        );
+      // Pattern C: getPackages returning directly
+      } else if (contents.includes("PackageList(this).packages")) {
+        contents = contents.replace(
+          "PackageList(this).packages",
+          "PackageList(this).packages.also { it.add(ScreenTimePackage()) }"
+        );
+      }
     }
 
     config.modResults.contents = contents;

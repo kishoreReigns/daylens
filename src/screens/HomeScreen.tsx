@@ -69,14 +69,21 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     ? `+${(stepData.deltaVsAvg / 1000).toFixed(1)}k`
     : `${(stepData.deltaVsAvg / 1000).toFixed(1)}k`;
 
+  const screenTimeDelta = () => {
+    if (screenTime.loading) return '…';
+    if (!screenTime.isAvailable) return 'tap to enable';
+    if (!screenTime.hasPermission) return 'tap to grant access';
+    return screenTime.topApps[0]?.appName ?? 'no apps tracked';
+  };
+
   const metrics = [
     {
       icon:       '📱',
       label:      'SCREEN TIME',
       value:      screenTime.loading ? '…' : screenTime.totalFormatted,
       unit:       'today',
-      delta:      screenTime.topApps[0]?.appName ?? 'loading…',
-      deltaLabel: 'top app',
+      delta:      screenTimeDelta(),
+      deltaLabel: screenTime.hasPermission ? 'top app' : 'permission',
       progress:   Math.min(screenTime.totalMinutes / 360, 1), // 6h = 100%
       gradColors: [colors.accentOrange, colors.accentPink] as [string, string],
       onPress:    () => (navigation as any).navigate('ScreenTime'),

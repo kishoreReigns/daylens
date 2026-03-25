@@ -25,12 +25,20 @@ const withScreenTimeNativeCode = (config) => {
     (config) => {
       const destDir = path.join(
         config.modRequest.platformProjectRoot,
-        "app", "src", "main", "java",
-        "com", "daylens", "ai", "screentime"
+        "app",
+        "src",
+        "main",
+        "java",
+        "com",
+        "daylens",
+        "ai",
+        "screentime",
       );
       const srcDir = path.join(
         config.modRequest.projectRoot,
-        "modules", "screen-time", "android-src"
+        "modules",
+        "screen-time",
+        "android-src",
       );
 
       fs.mkdirSync(destDir, { recursive: true });
@@ -62,7 +70,7 @@ const withScreenTimeMainApplication = (config) => {
     if (!contents.includes(importLine)) {
       contents = contents.replace(
         /(import [^\n]+\n)(\n*class )/,
-        `$1${importLine}\n$2`
+        `$1${importLine}\n$2`,
       );
     }
 
@@ -72,19 +80,19 @@ const withScreenTimeMainApplication = (config) => {
       if (contents.includes("val packages = PackageList(this).packages")) {
         contents = contents.replace(
           "val packages = PackageList(this).packages",
-          "val packages = PackageList(this).packages\n        packages.add(ScreenTimePackage())"
+          "val packages = PackageList(this).packages\n        packages.add(ScreenTimePackage())",
         );
-      // Pattern B (RN 0.71+): return PackageList(this).packages
+        // Pattern B (RN 0.71+): return PackageList(this).packages
       } else if (contents.includes("return PackageList(this).packages")) {
         contents = contents.replace(
           "return PackageList(this).packages",
-          "val packages = PackageList(this).packages\n          packages.add(ScreenTimePackage())\n          return packages"
+          "val packages = PackageList(this).packages\n          packages.add(ScreenTimePackage())\n          return packages",
         );
-      // Pattern C: getPackages returning directly
+        // Pattern C: getPackages returning directly
       } else if (contents.includes("PackageList(this).packages")) {
         contents = contents.replace(
           "PackageList(this).packages",
-          "PackageList(this).packages.also { it.add(ScreenTimePackage()) }"
+          "PackageList(this).packages.also { it.add(ScreenTimePackage()) }",
         );
       }
     }
@@ -105,7 +113,7 @@ const withScreenTimePermission = (config) => {
 
     const PERM = "android.permission.PACKAGE_USAGE_STATS";
     const already = manifest["uses-permission"].some(
-      (p) => p.$?.["android:name"] === PERM
+      (p) => p.$?.["android:name"] === PERM,
     );
 
     if (!already) {

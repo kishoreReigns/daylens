@@ -17,6 +17,32 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
 
     override fun getName() = "ScreenTime"
 
+    // Packages to always exclude — system infrastructure that inflates time
+    private val EXCLUDED_PACKAGES = setOf(
+        "android",
+        "com.android.systemui",
+        "com.android.launcher",
+        "com.android.launcher2",
+        "com.android.launcher3",
+        "com.google.android.launcher",
+        "com.sec.android.app.launcher",          // Samsung
+        "com.miui.home",                          // Xiaomi
+        "com.huawei.android.launcher",           // Huawei
+        "com.oppo.launcher",                      // Oppo
+        "com.vivo.launcher",                      // Vivo
+        "com.oneplus.launcher",                   // OnePlus
+        "com.android.phone",
+        "com.android.incallui",
+        "com.android.server.telecom",
+        "com.android.inputmethod.latin",
+        "com.google.android.inputmethod.latin",
+        "com.samsung.android.honeyboard",
+        "com.android.settings",
+        "com.android.packageinstaller",
+        "com.google.android.packageinstaller",
+        "com.android.vending",                    // Play Store itself
+    )
+
     @ReactMethod
     fun hasPermission(promise: Promise) {
         promise.resolve(checkUsagePermission())
@@ -50,6 +76,7 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
             val usm = reactApplicationContext
                 .getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
+            // Exact midnight → now for today only
             val cal = Calendar.getInstance()
             val endTime = cal.timeInMillis
             cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -58,22 +85,31 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
             cal.set(Calendar.MILLISECOND, 0)
             val startTime = cal.timeInMillis
 
+            // INTERVAL_BEST gives the most fine-grained data for the requested window
             val stats = usm.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY, startTime, endTime
+                UsageStatsManager.INTERVAL_BEST, startTime, endTime
             )
 
             val pm = reactApplicationContext.packageManager
-            // Aggregate duplicate entries per package
+            val ownPackage = reactApplicationContext.packageName
+
+            // Aggregate per package
             val timeMap = mutableMapOf<String, Long>()
             val lastMap = mutableMapOf<String, Long>()
 
             stats?.forEach { s ->
-                if (s.totalTimeInForeground > 30_000L) {
-                    timeMap[s.packageName] =
-                        (timeMap[s.packageName] ?: 0L) + s.totalTimeInForeground
-                    if (s.lastTimeUsed > (lastMap[s.packageName] ?: 0L)) {
-                        lastMap[s.packageName] = s.lastTimeUsed
-                    }
+                val pkg = s.packageName
+                // Skip our own app, excluded list, and entries < 1 second
+                if (pkg == ownPackage) return@forEach
+                if (EXCLUDED_PACKAGES.contains(pkg)) return@forEach
+                if (s.totalTimeInForeground < 1_000L) return@forEach
+
+                // Skip pure system infrastructure packages
+                if (isSystemInfraPackage(pm, pkg)) return@forEach
+
+                timeMap[pkg] = (timeMap[pkg] ?: 0L) + s.totalTimeInForeground
+                if (s.lastTimeUsed > (lastMap[pkg] ?: 0L)) {
+                    lastMap[pkg] = s.lastTimeUsed
                 }
             }
 
@@ -114,6 +150,38 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Returns true for packages that are pure OS/infrastructure — no visible UI.
+     * We keep system apps that the user actually launches (e.g. Gallery, Camera).
+     */
+    private fun isSystemInfraPackage(pm: PackageManager, pkg: String): Boolean {
+        // Filter known Android system infrastructure prefixes
+        val infraPrefixes = listOf(
+            "com.android.server",
+            "com.android.providers",
+            "com.android.bluetooth",
+            "com.android.nfc",
+            "com.android.wifi",
+            "com.android.networklocation",
+            "com.google.android.gms",             // GMS background services (very high time)
+            "com.google.android.gsf",
+            "com.google.android.syncadapters",
+        )
+        if (infraPrefixes.any { pkg.startsWith(it) }) return true
+
+        // Also skip if not installed / no launcher intent and is system
+        return try {
+            val flags = pm.getApplicationInfo(pkg, 0).flags
+            val isSystem = (flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            if (!isSystem) return false
+            // Keep system apps that have a launcher icon (user-visible)
+            val hasLauncher = pm.getLaunchIntentForPackage(pkg) != null
+            !hasLauncher
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun checkUsagePermission(): Boolean {
         return try {
             val am = reactApplicationContext
@@ -138,3 +206,4 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
         }
     }
 }
+

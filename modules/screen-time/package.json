@@ -1,0 +1,10 @@
+{
+  "name": "screen-time",
+  "version": "1.0.0",
+  "description": "Local Expo native module — reads Android UsageStatsManager for per-app screen time",
+  "main": "index.ts",
+  "peerDependencies": {
+    "expo": "*",
+    "react-native": "*"
+  }
+}

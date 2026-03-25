@@ -9,38 +9,46 @@ import { ScreenTime, type ScreenTimeResult, type AppUsage } from '../../modules/
 
 export interface ScreenTimeState {
   /** Is the native module available? (false in Expo Go) */
-  isAvailable:   boolean;
+  isAvailable: boolean;
   /** Does the user have PACKAGE_USAGE_STATS permission? */
   hasPermission: boolean;
   /** True while loading */
-  loading:       boolean;
+  loading: boolean;
   /** Total phone usage today in minutes */
-  totalMinutes:  number;
+  totalMinutes: number;
   /** Formatted string, e.g. "4h 12m" */
   totalFormatted: string;
   /** Top apps sorted by usage descending */
-  topApps:       AppUsage[];
+  topApps: AppUsage[];
   /** Request permission (opens Usage Access settings on Android) */
   requestPermission: () => Promise<void>;
   /** Re-fetch data */
-  refresh:       () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 export function useScreenTime(): ScreenTimeState {
-  const [data, setData]             = useState<ScreenTimeResult | null>(null);
-  const [loading, setLoading]       = useState(true);
+  const [data, setData] = useState<ScreenTimeResult | null>(null);
+  const [loading, setLoading] = useState(true);
   const [hasPermission, setHasPerm] = useState(false);
   const isAvailable = ScreenTime.isAvailable();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const perm = await ScreenTime.hasPermission();
-      setHasPerm(perm);
+      if (ScreenTime.isAvailable()) {
+        const perm = await ScreenTime.hasPermission();
+        setHasPerm(perm);
+        if (!perm) {
+          // Open Usage Access settings on first load so user sees the prompt
+          await ScreenTime.openPermissionSettings();
+          // Set empty state — app-state listener will refresh when user returns
+          setData({ permitted: false, totalTodayMs: 0, apps: [] });
+          return;
+        }
+      }
       const result = await ScreenTime.getUsageStats();
       setData(result);
     } catch (err) {
-      // Silently fail — show mock / empty state
       console.warn('[useScreenTime]', err);
     } finally {
       setLoading(false);
@@ -63,10 +71,10 @@ export function useScreenTime(): ScreenTimeState {
     // After the user returns from settings, the app-state listener will re-load
   }, []);
 
-  const totalMs      = data?.totalTodayMs ?? 0;
+  const totalMs = data?.totalTodayMs ?? 0;
   const totalMinutes = Math.round(totalMs / 60000);
-  const hours        = Math.floor(totalMinutes / 60);
-  const mins         = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
   const totalFormatted = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 
   const topApps = (data?.apps ?? [])

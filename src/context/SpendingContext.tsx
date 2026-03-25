@@ -6,9 +6,12 @@ import React, {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   useMemo,
 } from 'react';
+import { useAuth }               from './AuthContext';
+import * as ExpensesAPI          from '../lib/api/expenses';
 
 // ── Category definitions ──────────────────────
 export type ExpenseCategory =
@@ -99,44 +102,64 @@ function monthPrefix(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// ── Some realistic seed data so the UI isn't empty ──
-function createSeedData(): Expense[] {
-  const today = todayISO();
-  const now = Date.now();
-  return [
-    { id: 's1', amount: 12.50, category: 'food',          note: 'Lunch — sandwich + coffee', date: today, createdAt: now - 3600000 },
-    { id: 's2', amount: 8.00,  category: 'transport',     note: 'Uber to office',            date: today, createdAt: now - 7200000 },
-    { id: 's3', amount: 4.99,  category: 'entertainment', note: 'Spotify subscription',      date: today, createdAt: now - 10800000 },
-    { id: 's4', amount: 22.00, category: 'shopping',      note: 'T-shirt online',            date: today, createdAt: now - 14400000 },
-    { id: 's5', amount: 6.50,  category: 'food',          note: 'Morning coffee + pastry',   date: today, createdAt: now - 18000000 },
-    { id: 's6', amount: 45.00, category: 'bills',         note: 'Electric bill',             date: today, createdAt: now - 86400000 },
-  ];
+/** Map a DB row to the local Expense shape */
+function rowToExpense(row: ExpensesAPI.ExpenseRow): Expense {
+  return {
+    id:        row.id,
+    amount:    row.amount,
+    category:  row.category as ExpenseCategory,
+    note:      row.note ?? '',
+    date:      row.date,
+    createdAt: new Date(row.created_at).getTime(),
+  };
 }
-
-let _nextId = 100;
 
 // ── Provider ──────────────────────────────────
 export function SpendingProvider({ children }: { children: React.ReactNode }) {
-  const [expenses, setExpenses]       = useState<Expense[]>(createSeedData);
+  const { user } = useAuth();
+  const [expenses, setExpenses]       = useState<Expense[]>([]);
   const [dailyBudget, setDailyBudget] = useState(50);
 
+  // ── Load expenses from Supabase whenever the user changes ──
+  useEffect(() => {
+    if (!user) {
+      setExpenses([]);
+      return;
+    }
+    ExpensesAPI.fetchExpenses().then((rows) => {
+      setExpenses(rows.map(rowToExpense));
+    });
+  }, [user]);
+
   const addExpense = useCallback(
-    (amount: number, category: ExpenseCategory, note: string) => {
-      const expense: Expense = {
-        id:        String(++_nextId),
+    async (amount: number, category: ExpenseCategory, note: string) => {
+      const { id, error } = await ExpensesAPI.insertExpense(amount, category, note);
+      if (error || !id) {
+        console.error('[SpendingContext] addExpense failed:', error);
+        return;
+      }
+      const newEntry: Expense = {
+        id,
         amount,
         category,
         note,
         date:      todayISO(),
         createdAt: Date.now(),
       };
-      setExpenses((prev) => [expense, ...prev]);
+      setExpenses((prev) => [newEntry, ...prev]);
     },
     [],
   );
 
-  const removeExpense = useCallback((id: string) => {
+  const removeExpense = useCallback(async (id: string) => {
+    // Optimistic update
     setExpenses((prev) => prev.filter((e) => e.id !== id));
+    const { error } = await ExpensesAPI.deleteExpense(id);
+    if (error) {
+      console.error('[SpendingContext] removeExpense failed:', error);
+      // Rollback: re-fetch to restore consistent state
+      ExpensesAPI.fetchExpenses().then((rows) => setExpenses(rows.map(rowToExpense)));
+    }
   }, []);
 
   // ── Derived data ────────────────────────────

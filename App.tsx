@@ -17,6 +17,7 @@ import ScreenTimeScreen       from './src/screens/ScreenTimeScreen';
 import DrawerMenu             from './src/components/DrawerMenu';
 import { AppProvider, useApp } from './src/context/AppContext';
 import { SpendingProvider }    from './src/context/SpendingContext';
+import { AuthProvider }        from './src/context/AuthContext';
 
 // Root stack wrapping tabs + modal screens
 export type RootStackParamList = {
@@ -85,10 +86,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <SpendingProvider>
-        <AppShell />
-      </SpendingProvider>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <SpendingProvider>
+          <AppShell />
+        </SpendingProvider>
+      </AppProvider>
+    </AuthProvider>
   );
 }

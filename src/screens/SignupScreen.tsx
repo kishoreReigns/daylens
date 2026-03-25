@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import type { ColorPalette } from '../constants/colors';
 import { Typography, Spacing, Radii, Shadow } from '../constants';
 
@@ -30,7 +31,8 @@ type SignupScreenProps = {
 };
 
 export default function SignupScreen({ navigation }: SignupScreenProps) {
-  const { colors, isDark, login } = useApp();
+  const { colors, isDark } = useApp();
+  const { signUp }         = useAuth();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
@@ -45,6 +47,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [emailFocused, setEmailFocused]       = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused]   = useState(false);
+  const [authError,   setAuthError]   = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
 
   // Entrance animation
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -67,9 +71,27 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
-  const handleSignup = () => {
-    // TODO: Integrate real auth — for now, just proceed
-    login();
+  const handleSignup = async () => {
+    if (!fullName.trim() || !email.trim() || !password) {
+      setAuthError('Please fill in all fields.');
+      return;
+    }
+    if (password !== confirmPw) {
+      setAuthError('Passwords do not match.');
+      return;
+    }
+    if (password.length < 6) {
+      setAuthError('Password must be at least 6 characters.');
+      return;
+    }
+    setAuthError(null);
+    setAuthLoading(true);
+    const error = await signUp(email, password, fullName);
+    setAuthLoading(false);
+    if (error) {
+      setAuthError(error);
+    }
+    // On success, AuthContext updates user → navigation to main app
   };
 
   return (
@@ -246,10 +268,18 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
               <Text style={styles.termsLink}>Privacy Policy</Text>
             </Text>
 
+            {/* ── Auth error ── */}
+            {authError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{authError}</Text>
+              </View>
+            ) : null}
+
             {/* ── Sign up button ── */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleSignup}
+              disabled={authLoading}
               style={styles.gradientButtonOuter}
             >
               <LinearGradient
@@ -258,7 +288,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientButton}
               >
-                <Text style={styles.gradientButtonText}>Create Account</Text>
+                <Text style={styles.gradientButtonText}>
+                  {authLoading ? 'Creating account…' : 'Create Account'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -418,6 +450,22 @@ function createStyles(c: ColorPalette, isDark: boolean) {
     termsLink: {
       color: c.accentPurple,
       fontWeight: '600',
+    },
+
+    /* ── Auth error ── */
+    errorBox: {
+      backgroundColor: 'rgba(239,68,68,0.12)',
+      borderRadius:    Radii.md,
+      borderWidth:     1,
+      borderColor:     'rgba(239,68,68,0.35)',
+      paddingVertical: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+      marginBottom:    Spacing.md,
+    },
+    errorText: {
+      ...(Typography.bodySM as any),
+      color: '#F87171',
+      textAlign: 'center',
     },
 
     /* ── Gradient CTA ── */

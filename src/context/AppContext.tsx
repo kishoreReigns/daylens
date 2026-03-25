@@ -12,6 +12,7 @@ import { Animated, Dimensions } from 'react-native';
 
 import { Colors, LightColors } from '../constants/colors';
 import type { ColorPalette } from '../constants/colors';
+import { useAuth } from './AuthContext';
 
 export const DRAWER_WIDTH = Math.min(
   Math.floor(Dimensions.get('window').width * 0.78),
@@ -31,7 +32,7 @@ export interface AppContextValue {
   drawerVisible:    boolean;
   drawerWidth:      number;
   isAuthenticated:  boolean;
-  login:            () => void;
+  /** @deprecated Use useAuth().signOut() directly */
   logout:           () => void;
 }
 
@@ -49,15 +50,16 @@ const AppContext = createContext<AppContextValue>({
   drawerVisible:    false,
   drawerWidth:      DRAWER_WIDTH,
   isAuthenticated:  false,
-  login:            () => {},
   logout:           () => {},
 });
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [theme,            setTheme]            = useState<Theme>('dark');
-  const [drawerVisible,    setDrawerVisible]    = useState(false);
-  const [isAuthenticated,  setIsAuthenticated]  = useState(false);
+  const { user, signOut } = useAuth();
+  const [theme,         setTheme]         = useState<Theme>('dark');
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const drawerX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
+
+  const isAuthenticated = user !== null;
 
   const openDrawer = useCallback(() => {
     setDrawerVisible(true);
@@ -87,8 +89,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const colors: ColorPalette = theme === 'dark' ? Colors : LightColors;
 
-  const login  = useCallback(() => setIsAuthenticated(true), []);
-  const logout = useCallback(() => setIsAuthenticated(false), []);
+  const logout = useCallback(() => { signOut(); }, [signOut]);
 
   return (
     <AppContext.Provider
@@ -103,7 +104,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         drawerVisible,
         drawerWidth:      DRAWER_WIDTH,
         isAuthenticated,
-        login,
         logout,
       }}
     >

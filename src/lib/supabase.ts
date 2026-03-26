@@ -14,25 +14,25 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 // ── Replace with your project values ─────────
-const SUPABASE_URL  = 'https://qvkopexsixfzyhxnhigk.supabase.co';
+const SUPABASE_URL = 'https://qvkopexsixfzyhxnhigk.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Kbs3JKnT4T2ncWDMjLoNwg_tPkO6j6e';
 // ─────────────────────────────────────────────
 
 if (
-  SUPABASE_URL.includes('YOUR_PROJECT_REF') ||
-  SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY')
+    SUPABASE_URL.includes('YOUR_PROJECT_REF') ||
+    SUPABASE_ANON_KEY.includes('YOUR_ANON_KEY')
 ) {
-  console.warn(
-    '[DayLens] Supabase credentials not set.\n' +
-    'Edit src/lib/supabase.ts and replace SUPABASE_URL and SUPABASE_ANON_KEY.'
-  );
+    console.warn(
+        '[DayLens] Supabase credentials not set.\n' +
+        'Edit src/lib/supabase.ts and replace SUPABASE_URL and SUPABASE_ANON_KEY.'
+    );
 }
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    storage:          AsyncStorage,
-    autoRefreshToken: true,
-    persistSession:   true,
-    detectSessionInUrl: false,
-  },
+    auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+    },
 });

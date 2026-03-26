@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 //  InsightsScreen · AI-generated daily summary
 // ─────────────────────────────────────────────
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,13 +21,15 @@ import { Card, ScoreCircle, InsightTag, GradientButton } from '../components';
 import { Colors, Typography, Spacing, Radii, Shadow } from '../constants';
 import type { ColorPalette } from '../constants/colors';
 import { GradientScoreRing } from '../constants/colors';
-import { useApp } from '../context/AppContext';
-import {
-  insightData,
-  todayData,
-  getScoreTier,
-  formatDate,
-} from '../data/mockData';
+import { useApp }     from '../context/AppContext';
+import { useSpending } from '../context/SpendingContext';
+import { useAuth }     from '../context/AuthContext';
+import { fetchRecentSteps }      from '../lib/api/steps';
+import { fetchRecentScreenTime } from '../lib/api/screenTime';
+import { getProfile }            from '../lib/api/auth';
+import { getAIInsights }         from '../lib/api/ai';
+import type { AIInsightResult }  from '../lib/api/ai';
+import { getScoreTier, formatDate } from '../data/mockData';
 import type { RootTabParamList } from '../navigation/AppNavigator';
 
 type InsightsScreenProps = {
@@ -37,27 +40,95 @@ export default function InsightsScreen({ navigation }: InsightsScreenProps) {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(28)).current;
   const { colors, openDrawer } = useApp();
+  const { user }               = useAuth();
+  const { todayTotal, todayExpenses, dailyBudget } = useSpending();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue:         1,
-        duration:        600,
-        easing:          Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue:         0,
-        duration:        550,
-        easing:          Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  // ── Real data state ───────────────────────────
+  const [insight,   setInsight]   = useState<AIInsightResult | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [todaySteps, setTodaySteps] = useState(0);
+  const [stepGoal,   setStepGoal]  = useState(10_000);
+  const [screenMs,   setScreenMs]  = useState(0);
+  const [topApps,    setTopApps]   = useState<{ appName: string; totalTimeMs: number }[]>([]);
 
-  const { tier }     = getScoreTier(insightData.lifeScore);
-  const ringColors   = GradientScoreRing[tier];
+  // ── Fetch all data then call AI ───────────────
+  const loadInsights = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [stepsData, screenData, profile] = await Promise.all([
+        fetchRecentSteps(1),
+        fetchRecentScreenTime(1),
+        getProfile(),
+      ]);
+
+      const steps   = stepsData[0]?.steps   ?? 0;
+      const goal    = profile?.step_goal    ?? 10_000;
+      const budget  = profile?.daily_budget ?? dailyBudget;
+      const totalMs = screenData[0]?.total_ms ?? 0;
+      const apps    = (screenData[0]?.apps_json as any[] ?? []) as { appName: string; totalTimeMs: number }[];
+
+      setTodaySteps(steps);
+      setStepGoal(goal);
+      setScreenMs(totalMs);
+      setTopApps(apps);
+
+      const topCategories = todayExpenses
+        .reduce<Record<string, number>>((acc, e) => {
+          acc[e.category] = (acc[e.category] ?? 0) + e.amount;
+          return acc;
+        }, {});
+      const sortedCats = Object.entries(topCategories)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k]) => k);
+
+      const result = await getAIInsights({
+        steps,
+        stepGoal:      goal,
+        screenTimeMs:  totalMs,
+        topApps:       apps.slice(0, 5),
+        totalSpent:    todayTotal,
+        dailyBudget:   budget,
+        topCategories: sortedCats.slice(0, 3),
+      });
+
+      setInsight(result);
+    } catch (e) {
+      console.error('[InsightsScreen] loadInsights error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [todayExpenses, todayTotal, dailyBudget]);
+
+  useEffect(() => {
+    if (user) loadInsights();
+  }, [user, loadInsights]);
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue:         1,
+          duration:        600,
+          easing:          Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue:         0,
+          duration:        550,
+          easing:          Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
+  // Derived display values
+  const screenHours   = Math.floor(screenMs / 3_600_000);
+  const screenMinutes = Math.floor((screenMs % 3_600_000) / 60_000);
+  const lifeScore     = insight?.lifeScore ?? 0;
+  const { tier }      = getScoreTier(lifeScore);
+  const ringColors    = GradientScoreRing[tier];
 
   return (
     <View style={styles.root}>
@@ -101,111 +172,121 @@ export default function InsightsScreen({ navigation }: InsightsScreenProps) {
             </View>
           </View>
 
-          {/* ── Hero score card ─────────────────── */}
-          <Animated.View
-            style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
-          >
-            <LinearGradient
-              colors={[
-                'rgba(139,92,246,0.18)',
-                'rgba(56,189,248,0.10)',
-                colors.card,
-              ]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroOrb} />
-
-              <View style={styles.heroInner}>
-                <ScoreCircle score={insightData.lifeScore} size={160} />
-
-                <View style={styles.heroText}>
-                  <Text style={styles.heroEmoji}>{insightData.moodEmoji}</Text>
-                  <Text style={styles.heroMood}>{insightData.mood}</Text>
-                  <Text style={styles.heroMoodLabel}>Today's mood</Text>
-
-                  <View style={styles.heroDivider} />
-
-                  <StatRow
-                    label="Screen"
-                    value={`${todayData.screenTime.hours}h ${todayData.screenTime.minutes}m`}
-                  />
-                  <StatRow
-                    label="Steps"
-                    value={todayData.steps.count.toLocaleString()}
-                  />
-                  <StatRow
-                    label="Spent"
-                    value={`$${todayData.spending.amount.toFixed(0)}`}
-                  />
-                </View>
-              </View>
-            </LinearGradient>
-          </Animated.View>
-
-          {/* ── Key Insight card ────────────────── */}
-          <SectionLabel emoji="💡" title="Key Insight" delay={100} />
-
-          <AnimatedCard delay={150}>
-            <Card gradient accentBorder style={styles.insightCard}>
-              <View style={styles.insightIconRow}>
+          {/* ── Loading state ──────────────────── */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.accentPurple} />
+              <Text style={styles.loadingText}>Analysing your day…</Text>
+            </View>
+          ) : (
+            <>
+              {/* ── Hero score card ─────────────── */}
+              <Animated.View
+                style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}
+              >
                 <LinearGradient
-                  colors={ringColors}
+                  colors={[
+                    'rgba(139,92,246,0.18)',
+                    'rgba(56,189,248,0.10)',
+                    colors.card,
+                  ]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.insightIconBubble}
+                  style={styles.heroCard}
                 >
-                  <Text style={styles.insightIconText}>{insightData.emoji}</Text>
+                  <View style={styles.heroOrb} />
+
+                  <View style={styles.heroInner}>
+                    <ScoreCircle score={lifeScore} size={160} />
+
+                    <View style={styles.heroText}>
+                      <Text style={styles.heroEmoji}>{insight?.moodEmoji ?? '😌'}</Text>
+                      <Text style={styles.heroMood}>{insight?.mood ?? '—'}</Text>
+                      <Text style={styles.heroMoodLabel}>Today's mood</Text>
+
+                      <View style={styles.heroDivider} />
+
+                      <StatRow
+                        label="Screen"
+                        value={`${screenHours}h ${screenMinutes}m`}
+                      />
+                      <StatRow
+                        label="Steps"
+                        value={todaySteps.toLocaleString()}
+                      />
+                      <StatRow
+                        label="Spent"
+                        value={`$${todayTotal.toFixed(0)}`}
+                      />
+                    </View>
+                  </View>
                 </LinearGradient>
-                <Text style={styles.insightCardLabel}>Today's key finding</Text>
-              </View>
-              <Text style={styles.insightBody}>{insightData.keyInsight}</Text>
-            </Card>
-          </AnimatedCard>
+              </Animated.View>
 
-          {/* ── Suggestion card ─────────────────── */}
-          <SectionLabel emoji="✅" title="AI Suggestion" delay={200} />
+              {/* ── Key Insight card ────────────── */}
+              <SectionLabel emoji="💡" title="Key Insight" delay={100} />
 
-          <AnimatedCard delay={250}>
-            <Card style={styles.suggestionCard}>
-              <View style={styles.suggestionBar} />
-              <Text style={styles.suggestionBody}>{insightData.suggestion}</Text>
-            </Card>
-          </AnimatedCard>
+              <AnimatedCard delay={150}>
+                <Card gradient accentBorder style={styles.insightCard}>
+                  <View style={styles.insightIconRow}>
+                    <LinearGradient
+                      colors={ringColors}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.insightIconBubble}
+                    >
+                      <Text style={styles.insightIconText}>{insight?.emoji ?? '💡'}</Text>
+                    </LinearGradient>
+                    <Text style={styles.insightCardLabel}>Today's key finding</Text>
+                  </View>
+                  <Text style={styles.insightBody}>{insight?.keyInsight ?? ''}</Text>
+                </Card>
+              </AnimatedCard>
 
-          {/* ── Tags ────────────────────────────── */}
-          <AnimatedCard delay={320}>
-            <View style={styles.tagsSection}>
-              <Text style={styles.tagsLabel}>Topics covered</Text>
-              <View style={styles.tagsRow}>
-                {insightData.tags.map((t) => (
-                  <InsightTag key={t} label={t} accent />
-                ))}
-              </View>
-            </View>
-          </AnimatedCard>
+              {/* ── Suggestion card ─────────────── */}
+              <SectionLabel emoji="✅" title="AI Suggestion" delay={200} />
 
-          {/* ── Quick actions ───────────────────── */}
-          <AnimatedCard delay={400}>
-            <View style={styles.actions}>
-              <GradientButton
-                label="See Full History"
-                icon="📅"
-                onPress={() => navigation.navigate('History')}
-                size="md"
-                style={styles.actionBtn}
-              />
-              <GradientButton
-                label="Share Insight"
-                icon="↗️"
-                onPress={() => {}}
-                variant="outline"
-                size="md"
-                style={styles.actionBtn}
-              />
-            </View>
-          </AnimatedCard>
+              <AnimatedCard delay={250}>
+                <Card style={styles.suggestionCard}>
+                  <View style={styles.suggestionBar} />
+                  <Text style={styles.suggestionBody}>{insight?.suggestion ?? ''}</Text>
+                </Card>
+              </AnimatedCard>
+
+              {/* ── Tags ────────────────────────── */}
+              <AnimatedCard delay={320}>
+                <View style={styles.tagsSection}>
+                  <Text style={styles.tagsLabel}>Topics covered</Text>
+                  <View style={styles.tagsRow}>
+                    {(insight?.tags ?? []).map((t) => (
+                      <InsightTag key={t} label={t} accent />
+                    ))}
+                  </View>
+                </View>
+              </AnimatedCard>
+
+              {/* ── Quick actions ───────────────── */}
+              <AnimatedCard delay={400}>
+                <View style={styles.actions}>
+                  <GradientButton
+                    label="Refresh Insights"
+                    icon="✦"
+                    onPress={loadInsights}
+                    size="md"
+                    style={styles.actionBtn}
+                  />
+                  <GradientButton
+                    label="See Full History"
+                    icon="📅"
+                    onPress={() => navigation.navigate('History')}
+                    variant="outline"
+                    size="md"
+                    style={styles.actionBtn}
+                  />
+                </View>
+              </AnimatedCard>
+            </>
+          )}
 
           <View style={{ height: 32 }} />
         </SafeAreaView>
@@ -450,6 +531,17 @@ function createStyles(c: ColorPalette) { return StyleSheet.create({
   },
   actionBtn: {
     alignSelf: 'stretch',
+  },
+  loadingContainer: {
+    flex:           1,
+    alignItems:     'center',
+    justifyContent: 'center',
+    paddingTop:     80,
+    gap:            16,
+  },
+  loadingText: {
+    ...Typography.bodyLG,
+    color: c.textTertiary,
   },
 }); }
 

@@ -10,8 +10,8 @@ import { makeRedirectUri } from 'expo-auth-session';
 // Required to complete the auth session when the browser redirects back
 WebBrowser.maybeCompleteAuthSession();
 
-const WEB_CLIENT_ID =
-  '103958198723-pkrjg8ek83rpt856bd655qaj0994r6mu.apps.googleusercontent.com';
+const WEB_CLIENT_ID     = '103958198723-pkrjg8ek83rpt856bd655qaj0994r6mu.apps.googleusercontent.com';
+const ANDROID_CLIENT_ID = '103958198723-u4ltgml93o8ipd4hr3eumn8u74hmt2t8.apps.googleusercontent.com';
 
 export function useGoogleAuth(onSuccess: (idToken: string) => Promise<void>) {
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,8 @@ export function useGoogleAuth(onSuccess: (idToken: string) => Promise<void>) {
   const redirectUri = makeRedirectUri({ scheme: 'com.daylens.ai' });
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: WEB_CLIENT_ID,
+    webClientId:     WEB_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT_ID,
     scopes: ['openid', 'email', 'profile'],
     redirectUri,
   });

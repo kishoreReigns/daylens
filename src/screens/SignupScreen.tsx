@@ -19,8 +19,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useApp }      from '../context/AppContext';
+import { useAuth }     from '../context/AuthContext';
+import { useToast }    from '../context/ToastContext';
+import { AppLoader }   from '../components';
 import type { ColorPalette } from '../constants/colors';
 import { Typography, Spacing, Radii, Shadow } from '../constants';
 
@@ -33,6 +35,7 @@ type SignupScreenProps = {
 export default function SignupScreen({ navigation }: SignupScreenProps) {
   const { colors, isDark } = useApp();
   const { signUp }         = useAuth();
+  const { showToast }      = useToast();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
@@ -47,7 +50,6 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [emailFocused, setEmailFocused]       = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused]   = useState(false);
-  const [authError,   setAuthError]   = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
 
   // Entrance animation
@@ -73,25 +75,29 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
   const handleSignup = async () => {
     if (!fullName.trim() || !email.trim() || !password) {
-      setAuthError('Please fill in all fields.');
+      showToast({ message: 'Please fill in all fields.', variant: 'error' });
       return;
     }
     if (password !== confirmPw) {
-      setAuthError('Passwords do not match.');
+      showToast({ message: 'Passwords do not match.', variant: 'error' });
       return;
     }
     if (password.length < 6) {
-      setAuthError('Password must be at least 6 characters.');
+      showToast({ message: 'Password must be at least 6 characters.', variant: 'error' });
       return;
     }
-    setAuthError(null);
     setAuthLoading(true);
     const error = await signUp(email, password, fullName);
     setAuthLoading(false);
     if (error) {
-      setAuthError(error);
+      showToast({ message: error, variant: 'error' });
+    } else {
+      showToast({
+        message:  '📧 Account created! Please check your email to confirm your address before signing in.',
+        variant:  'success',
+        duration: 6000,
+      });
     }
-    // On success, AuthContext updates user → navigation to main app
   };
 
   return (
@@ -268,13 +274,6 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
               <Text style={styles.termsLink}>Privacy Policy</Text>
             </Text>
 
-            {/* ── Auth error ── */}
-            {authError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{authError}</Text>
-              </View>
-            ) : null}
-
             {/* ── Sign up button ── */}
             <TouchableOpacity
               activeOpacity={0.85}
@@ -288,9 +287,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientButton}
               >
-                <Text style={styles.gradientButtonText}>
-                  {authLoading ? 'Creating account…' : 'Create Account'}
-                </Text>
+                <Text style={styles.gradientButtonText}>Create Account</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -323,6 +320,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <AppLoader visible={authLoading} message="Creating your account…" />
     </View>
   );
 }
@@ -450,22 +448,6 @@ function createStyles(c: ColorPalette, isDark: boolean) {
     termsLink: {
       color: c.accentPurple,
       fontWeight: '600',
-    },
-
-    /* ── Auth error ── */
-    errorBox: {
-      backgroundColor: 'rgba(239,68,68,0.12)',
-      borderRadius:    Radii.md,
-      borderWidth:     1,
-      borderColor:     'rgba(239,68,68,0.35)',
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.md,
-      marginBottom:    Spacing.md,
-    },
-    errorText: {
-      ...(Typography.bodySM as any),
-      color: '#F87171',
-      textAlign: 'center',
     },
 
     /* ── Gradient CTA ── */

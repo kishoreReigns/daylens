@@ -15,9 +15,10 @@ import AddExpenseScreen       from './src/screens/AddExpenseScreen';
 import QuickAddScreen         from './src/screens/QuickAddScreen';
 import ScreenTimeScreen       from './src/screens/ScreenTimeScreen';
 import DrawerMenu             from './src/components/DrawerMenu';
-import { AppProvider, useApp } from './src/context/AppContext';
-import { SpendingProvider }    from './src/context/SpendingContext';
-import { AuthProvider }        from './src/context/AuthContext';
+import { AppProvider, useApp }  from './src/context/AppContext';
+import { SpendingProvider }     from './src/context/SpendingContext';
+import { AuthProvider }         from './src/context/AuthContext';
+import { ToastProvider }        from './src/context/ToastContext';
 
 // Root stack wrapping tabs + modal screens
 export type RootStackParamList = {
@@ -89,7 +90,9 @@ export default function App() {
     <AuthProvider>
       <AppProvider>
         <SpendingProvider>
-          <AppShell />
+          <ToastProvider>
+            <AppShell />
+          </ToastProvider>
         </SpendingProvider>
       </AppProvider>
     </AuthProvider>

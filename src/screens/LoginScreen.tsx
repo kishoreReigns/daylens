@@ -21,6 +21,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { AppLoader } from '../components';
 import type { ColorPalette } from '../constants/colors';
 import { Typography, Spacing, Radii, Shadow } from '../constants';
 
@@ -41,8 +43,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused]     = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-  const [authError,  setAuthError]  = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const { showToast } = useToast();
 
   // Subtle entrance animation
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -67,15 +69,14 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      setAuthError('Please enter your email and password.');
+      showToast({ message: 'Please enter your email and password.', variant: 'error' });
       return;
     }
-    setAuthError(null);
     setAuthLoading(true);
     const error = await signIn(email, password);
     setAuthLoading(false);
     if (error) {
-      setAuthError(error);
+      showToast({ message: error, variant: 'error' });
     }
     // On success, AuthContext updates user → AppContext.isAuthenticated → navigation
   };
@@ -202,13 +203,6 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
 
-            {/* ── Auth error ── */}
-            {authError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{authError}</Text>
-              </View>
-            ) : null}
-
             {/* ── Login button ── */}
             <TouchableOpacity
               activeOpacity={0.85}
@@ -222,9 +216,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
                 end={{ x: 1, y: 0 }}
                 style={styles.gradientButton}
               >
-                <Text style={styles.gradientButtonText}>
-                  {authLoading ? 'Signing in…' : 'Sign In'}
-                </Text>
+                <Text style={styles.gradientButtonText}>Sign In</Text>
               </LinearGradient>
             </TouchableOpacity>
 
@@ -257,6 +249,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <AppLoader visible={authLoading} message="Signing in…" />
     </View>
   );
 }
@@ -391,22 +384,6 @@ function createStyles(c: ColorPalette, isDark: boolean) {
     forgotText: {
       ...(Typography.labelMD as any),
       color: c.accentPurple,
-    },
-
-    /* ── Auth error ── */
-    errorBox: {
-      backgroundColor: 'rgba(239,68,68,0.12)',
-      borderRadius:    Radii.md,
-      borderWidth:     1,
-      borderColor:     'rgba(239,68,68,0.35)',
-      paddingVertical: Spacing.sm,
-      paddingHorizontal: Spacing.md,
-      marginBottom:    Spacing.md,
-    },
-    errorText: {
-      ...(Typography.bodySM as any),
-      color: '#F87171',
-      textAlign: 'center',
     },
 
     /* ── Gradient CTA ── */

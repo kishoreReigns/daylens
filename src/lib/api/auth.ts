@@ -34,6 +34,17 @@ export async function signIn(
     return { error: error?.message ?? null };
 }
 
+// ── Sign in with Google ID token ──────────────
+export async function signInWithGoogleIdToken(
+    idToken: string,
+): Promise<{ error: string | null }> {
+    const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+    });
+    return { error: error?.message ?? null };
+}
+
 // ── Sign out ──────────────────────────────────
 export async function signOut(): Promise<void> {
     await supabase.auth.signOut();

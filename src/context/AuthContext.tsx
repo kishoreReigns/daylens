@@ -16,21 +16,23 @@ import * as AuthAPI           from '../lib/api/auth';
 
 // ── Context shape ─────────────────────────────
 export interface AuthContextValue {
-  user:           User    | null;
-  session:        Session | null;
-  loading:        boolean;
-  signIn:  (email: string, password: string)                      => Promise<string | null>;
-  signUp:  (email: string, password: string, fullName: string)    => Promise<string | null>;
-  signOut: ()                                                      => Promise<void>;
+  user:               User    | null;
+  session:            Session | null;
+  loading:            boolean;
+  signIn:             (email: string, password: string)                   => Promise<string | null>;
+  signUp:             (email: string, password: string, fullName: string) => Promise<string | null>;
+  signOut:            ()                                                   => Promise<void>;
+  signInWithGoogle:   (idToken: string)                                   => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
-  user:    null,
-  session: null,
-  loading: true,
-  signIn:  async () => null,
-  signUp:  async () => null,
-  signOut: async () => {},
+  user:             null,
+  session:          null,
+  loading:          true,
+  signIn:           async () => null,
+  signUp:           async () => null,
+  signOut:          async () => {},
+  signInWithGoogle: async () => null,
 });
 
 // ── Provider ──────────────────────────────────
@@ -81,8 +83,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AuthAPI.signOut();
   }, []);
 
+  const signInWithGoogle = useCallback(
+    async (idToken: string): Promise<string | null> => {
+      const { error } = await AuthAPI.signInWithGoogleIdToken(idToken);
+      return error;
+    },
+    [],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

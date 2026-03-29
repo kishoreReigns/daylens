@@ -23,6 +23,7 @@ import { useApp }      from '../context/AppContext';
 import { useAuth }     from '../context/AuthContext';
 import { useToast }    from '../context/ToastContext';
 import { AppLoader }   from '../components';
+import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import type { ColorPalette } from '../constants/colors';
 import { Typography, Spacing, Radii, Shadow } from '../constants';
 
@@ -34,10 +35,17 @@ type SignupScreenProps = {
 
 export default function SignupScreen({ navigation }: SignupScreenProps) {
   const { colors, isDark } = useApp();
-  const { signUp }         = useAuth();
+  const { signUp, signInWithGoogle } = useAuth();
   const { showToast }      = useToast();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
+  const { signInWithGoogle: promptGoogle, loading: googleLoading } = useGoogleAuth(
+    async (idToken) => {
+      const error = await signInWithGoogle(idToken);
+      if (error) showToast({ message: error, variant: 'error' });
+    },
+  );
 
   const [fullName, setFullName]     = useState('');
   const [email, setEmail]           = useState('');
@@ -51,6 +59,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmFocused, setConfirmFocused]   = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+
+  const isLoading = authLoading || googleLoading;
 
   // Entrance animation
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -278,7 +288,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleSignup}
-              disabled={authLoading}
+              disabled={isLoading}
               style={styles.gradientButtonOuter}
             >
               <LinearGradient
@@ -300,11 +310,15 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
             {/* ── Social buttons ── */}
             <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity
+                style={[styles.socialButton, (!promptGoogle || isLoading) && { opacity: 0.5 }]}
+                onPress={promptGoogle}
+                disabled={isLoading}
+              >
                 <Text style={styles.socialIcon}>G</Text>
                 <Text style={styles.socialLabel}>Google</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity style={[styles.socialButton, { opacity: 0.4 }]} disabled>
                 <Text style={styles.socialIcon}>🍎</Text>
                 <Text style={styles.socialLabel}>Apple</Text>
               </TouchableOpacity>
@@ -320,7 +334,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <AppLoader visible={authLoading} message="Creating your account…" />
+      <AppLoader visible={isLoading} message={googleLoading ? 'Signing in with Google…' : 'Creating your account…'} />
     </View>
   );
 }

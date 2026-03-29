@@ -3,6 +3,7 @@
     "name": "DayLens AI",
     "slug": "daylens-ai",
     "version": "1.0.0",
+    "scheme": "com.daylens.ai",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
@@ -15,7 +16,8 @@
           "motionPermission": "DayLens needs motion access to track your daily steps."
         }
       ],
-      "./plugins/withScreenTime"
+      "./plugins/withScreenTime",
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": false,

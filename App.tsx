@@ -48,7 +48,7 @@ function AppShell() {
   };
 
   return (
-    <SafeAreaProvider>
+    <>
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <StatusBar
           style={isDark ? 'light' : 'dark'}
@@ -81,20 +81,22 @@ function AppShell() {
       </View>
       {/* Drawer rendered above navigation (only when authenticated) */}
       {isAuthenticated && <DrawerMenu />}
-    </SafeAreaProvider>
+    </>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <SpendingProvider>
-          <ToastProvider>
-            <AppShell />
-          </ToastProvider>
-        </SpendingProvider>
-      </AppProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <AppProvider>
+          <SpendingProvider>
+            <ToastProvider>
+              <AppShell />
+            </ToastProvider>
+          </SpendingProvider>
+        </AppProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

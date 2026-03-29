@@ -3,9 +3,8 @@
 //  Uses expo-auth-session + Supabase signInWithIdToken
 // ─────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import * as Google        from 'expo-auth-session/providers/google';
-import * as WebBrowser    from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
+import * as Google     from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 
 // Required to complete the auth session when the browser redirects back
 WebBrowser.maybeCompleteAuthSession();
@@ -17,13 +16,14 @@ export function useGoogleAuth(onSuccess: (idToken: string) => Promise<void>) {
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
-  const redirectUri = makeRedirectUri({ scheme: 'com.daylens.ai' });
-
+  // Do NOT pass a custom redirectUri — let expo-auth-session compute the
+  // correct platform-specific one automatically:
+  //   • Android native  → com.googleusercontent.apps.{id}:/oauth2redirect/google
+  //   • Expo Go (dev)   → https://auth.expo.io/@kishore0109/daylens-ai
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId:     WEB_CLIENT_ID,
     androidClientId: ANDROID_CLIENT_ID,
     scopes: ['openid', 'email', 'profile'],
-    redirectUri,
   });
 
   // React to Google OAuth response

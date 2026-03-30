@@ -142,15 +142,17 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
                     }
                     UsageEvents.Event.ACTIVITY_PAUSED,
                     UsageEvents.Event.ACTIVITY_STOPPED -> {
-                        val resumeAt = resumeMap.remove(pkg) ?: return@forEach
-                        // Clip to today: only count time AFTER midnight
-                        val sessionStart = maxOf(resumeAt, startTime)
-                        val sessionEnd = minOf(event.timeStamp, endTime)
-                        val duration = sessionEnd - sessionStart
-                        if (duration > 0L) {
-                            timeMap[pkg] = (timeMap[pkg] ?: 0L) + duration
-                            val prevLast = lastMap[pkg] ?: 0L
-                            if (sessionEnd > prevLast) lastMap[pkg] = sessionEnd
+                        val resumeAt = resumeMap.remove(pkg)
+                        if (resumeAt != null) {
+                            // Clip to today: only count time AFTER midnight
+                            val sessionStart = maxOf(resumeAt, startTime)
+                            val sessionEnd = minOf(event.timeStamp, endTime)
+                            val duration = sessionEnd - sessionStart
+                            if (duration > 0L) {
+                                timeMap[pkg] = (timeMap[pkg] ?: 0L) + duration
+                                val prevLast = lastMap[pkg] ?: 0L
+                                if (sessionEnd > prevLast) lastMap[pkg] = sessionEnd
+                            }
                         }
                     }
                 }

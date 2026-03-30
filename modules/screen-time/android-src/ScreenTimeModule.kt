@@ -1,6 +1,7 @@
 package com.daylens.ai.screentime
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -17,6 +18,7 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
 
     override fun getName() = "ScreenTime"
 
+    // Exact packages to always exclude
     private val EXCLUDED_PACKAGES = setOf(
         "android",
         "com.android.systemui",
@@ -42,6 +44,7 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
         "com.android.vending",
     )
 
+    // Entire package namespaces that are system infrastructure
     private val EXCLUDED_PREFIXES = listOf(
         "android.",
         "com.android.server",
@@ -57,6 +60,7 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
         "com.samsung.android.knox",
     )
 
+    // Display-name keywords that mean it is a system process
     private val EXCLUDED_NAME_KEYWORDS = setOf(
         "android", "android os", "android system",
         "system ui", "systemui",
@@ -96,34 +100,73 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
             val usm = reactApplicationContext
                 .getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
 
+            // Today: midnight → now
             val cal = Calendar.getInstance()
             val endTime = cal.timeInMillis
             cal.set(Calendar.HOUR_OF_DAY, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
             cal.set(Calendar.MILLISECOND, 0)
-            val startTime = cal.timeInMillis
+            val startTime = cal.timeInMillis   // exact midnight
 
             val pm = reactApplicationContext.packageManager
             val ownPackage = reactApplicationContext.packageName
 
-            val stats = usm.queryUsageStats(
-                UsageStatsManager.INTERVAL_DAILY, startTime, endTime
-            )
+            // ── queryEvents with pre-midnight buffer ──────────────────────────
+            // We start the query 4 hours before midnight so that apps which were
+            // already in the foreground at midnight are captured. Each session is
+            // then CLIPPED to [startTime, endTime] so only today's foreground
+            // time is counted. This is the only approach that:
+            //   (a) doesn't double-count like INTERVAL_BEST, and
+            //   (b) doesn't miss cross-midnight sessions like a plain midnight query.
+            val PRE_MIDNIGHT_BUFFER = 4L * 60 * 60 * 1000   // 4 hours in ms
+            val queryStart = startTime - PRE_MIDNIGHT_BUFFER
 
+            val events = usm.queryEvents(queryStart, endTime)
+            val event = UsageEvents.Event()
+
+            // pkg → timestamp of the most recent RESUMED event
+            val resumeMap = mutableMapOf<String, Long>()
+            // pkg → accumulated foreground ms for today
             val timeMap = mutableMapOf<String, Long>()
+            // pkg → last time the app was used today
             val lastMap = mutableMapOf<String, Long>()
 
-            stats?.forEach { s ->
-                val ms = s.totalTimeInForeground
-                if (ms > 0L) {
-                    val prev = timeMap[s.packageName] ?: 0L
-                    if (ms > prev) timeMap[s.packageName] = ms
-                    val prevLast = lastMap[s.packageName] ?: 0L
-                    if (s.lastTimeUsed > prevLast) lastMap[s.packageName] = s.lastTimeUsed
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val pkg = event.packageName
+
+                when (event.eventType) {
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        resumeMap[pkg] = event.timeStamp
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED,
+                    UsageEvents.Event.ACTIVITY_STOPPED -> {
+                        val resumeAt = resumeMap.remove(pkg) ?: return@forEach
+                        // Clip to today: only count time AFTER midnight
+                        val sessionStart = maxOf(resumeAt, startTime)
+                        val sessionEnd = minOf(event.timeStamp, endTime)
+                        val duration = sessionEnd - sessionStart
+                        if (duration > 0L) {
+                            timeMap[pkg] = (timeMap[pkg] ?: 0L) + duration
+                            val prevLast = lastMap[pkg] ?: 0L
+                            if (sessionEnd > prevLast) lastMap[pkg] = sessionEnd
+                        }
+                    }
                 }
             }
 
+            // Apps still in foreground right now — add elapsed time since resume
+            resumeMap.forEach { (pkg, resumeAt) ->
+                val sessionStart = maxOf(resumeAt, startTime)
+                val duration = endTime - sessionStart
+                if (duration > 0L) {
+                    timeMap[pkg] = (timeMap[pkg] ?: 0L) + duration
+                    lastMap[pkg] = endTime
+                }
+            }
+
+            // ── Inclusion filter ─────────────────────────────────────────────
             fun shouldInclude(pkg: String, ms: Long): Boolean {
                 if (pkg == ownPackage) return false
                 if (ms < 1_000L) return false
@@ -138,10 +181,12 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
                 return true
             }
 
+            // Total across ALL qualifying apps
             val totalMs = timeMap.entries
                 .filter { (pkg, ms) -> shouldInclude(pkg, ms) }
                 .sumOf { it.value }
 
+            // Top 20 for the list
             val appsArray = Arguments.createArray()
             timeMap.entries
                 .filter { (pkg, ms) -> shouldInclude(pkg, ms) }
@@ -177,6 +222,7 @@ class ScreenTimeModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    // System apps without a launcher icon are invisible background services — exclude them.
     private fun isInvisibleSystemApp(pm: PackageManager, pkg: String): Boolean {
         return try {
             val flags = pm.getApplicationInfo(pkg, 0).flags

@@ -47,6 +47,7 @@ export default function ScreenTimeScreen({ navigation }: Props) {
     isAvailable,
     hasPermission,
     loading,
+    totalMs,
     totalMinutes,
     totalFormatted,
     topApps,
@@ -69,7 +70,7 @@ export default function ScreenTimeScreen({ navigation }: Props) {
     const color   = appColor(item.appName);
     const initial = appInitial(item.appName);
     const appMins = Math.round(item.totalTimeMs / 60000);
-    const pct     = Math.round((item.totalTimeMs / (totalMinutes * 60000 || 1)) * 100);
+    const pct     = Math.min(100, Math.round((item.totalTimeMs / (totalMs || 1)) * 100));
 
     return (
       <View style={[styles.appRow, index !== 0 && styles.appRowBorder]}>

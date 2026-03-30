@@ -14,6 +14,8 @@ export interface ScreenTimeState {
   hasPermission: boolean;
   /** True while loading */
   loading: boolean;
+  /** Total phone usage today in raw milliseconds */
+  totalMs: number;
   /** Total phone usage today in minutes */
   totalMinutes: number;
   /** Formatted string, e.g. "4h 12m" */
@@ -83,6 +85,7 @@ export function useScreenTime(): ScreenTimeState {
     isAvailable,
     hasPermission: data?.permitted ?? hasPermission,
     loading,
+    totalMs,
     totalMinutes,
     totalFormatted,
     topApps,
